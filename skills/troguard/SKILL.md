@@ -1,6 +1,6 @@
 ---
 name: troguard
-description: Check print-on-demand, apparel, and cross-border ecommerce images for copyright and TRO infringement risk with TroGuard. Use when the user mentions TRO, TroGuard, 侵权检测, 版权检测, 印花检测, 图案风险, TRO 案件库, batch image checks, or TROGUARD_API_KEY, or asks whether artwork is safe to list.
+description: 用 TroGuard 检查 POD 印花、服装和跨境电商图片的版权与 TRO 侵权风险。当用户提到 TRO、TroGuard、侵权检测、版权检测、印花检测、图案风险、TRO 案件库、批量图片检测或 TROGUARD_API_KEY，或询问设计稿/图案能否上架时使用。Check print-on-demand, apparel, and cross-border ecommerce images for copyright and TRO infringement risk with TroGuard.
 metadata:
   author: TroGuard
   version: 1.0.0
