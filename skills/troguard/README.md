@@ -16,17 +16,20 @@ npx skills add mind6683b-a11y/troguard-skills@troguard
 
 ## 配置
 
+还没有账号？先到 <https://app.troguard.com/> 注册并验证邮箱，**送 200 盾石，约 200 次深度检测**（1 盾石/张），不需要信用卡。
+
 1. 登录 <https://app.troguard.com/>，切换到要计费的团队。
 2. 左侧「Agent → Agent Skill」→ 创建 API Key；完整 Key 只显示一次。
-3. 设置环境变量：
+3. 安全保存 Key（不回显，写入 `~/.config/troguard.env`，权限 600）：
 
 ```bash
-export TROGUARD_API_KEY='trk_...'
-# 可选，默认 https://app.troguard.com
-export TROGUARD_API_BASE='https://app.troguard.com'
+mkdir -p ~/.config
+read -rsp "TroGuard API Key: " TROGUARD_API_KEY && echo
+(umask 077 && printf "TROGUARD_API_KEY='%s'\n" "$TROGUARD_API_KEY" > ~/.config/troguard.env)
+unset TROGUARD_API_KEY
 ```
 
-不要在聊天、仓库或日志里保存完整 Key；泄露后在门户立即吊销。
+脚本会自动读取 `~/.config/troguard.env`；也可以直接 `export TROGUARD_API_KEY='trk_...'`。不要在聊天、仓库或日志里保存完整 Key；泄露后在门户立即吊销。
 
 ## 使用
 

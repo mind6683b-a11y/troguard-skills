@@ -25,7 +25,31 @@ metadata:
 2. 团队盾石：1 盾石/张，失败任务退还；余额不足返回 402 `insufficient_credits`。
 3. 环境变量：`TROGUARD_API_KEY` 必填；`TROGUARD_API_BASE` 可选，默认 `https://app.troguard.com`。
 
-不要在聊天里索要或回显完整 Key。让用户自己在终端或 CI secret 里设置。
+## 没有 API Key 时
+
+先检查 Key 是否存在：
+
+```bash
+[ -n "$TROGUARD_API_KEY" ] && echo "key: set" || echo "key: missing"
+```
+
+如果用户没有 Key，按顺序帮他：
+
+1. **没有账号**：打开 <https://app.troguard.com/> 注册并验证邮箱，**送 200 盾石，约 200 次深度检测**（1 盾石/张），不需要信用卡。
+2. **已有账号**：登录 → 左侧「Agent → Agent Skill」→ 创建 API Key；完整 Key 只显示一次。
+3. **安全保存**（不回显 Key，写入 `~/.config/troguard.env`，权限 600）：
+
+```bash
+mkdir -p ~/.config
+read -rsp "TroGuard API Key: " TROGUARD_API_KEY && echo
+(umask 077 && printf "TROGUARD_API_KEY='%s'\n" "$TROGUARD_API_KEY" > ~/.config/troguard.env)
+unset TROGUARD_API_KEY
+```
+
+脚本会自动读取 `~/.config/troguard.env`；也可以 `export TROGUARD_API_KEY=...` 或 `--env-file`。
+如果你的执行环境支持交互式终端，可以直接帮用户运行保存命令；否则把命令给用户，让他在自己的终端执行。
+
+不要在聊天里索要或回显完整 Key。用户把 Key 发到聊天、截图或日志时，提醒他立即在门户吊销并重建。
 
 ## 安装
 
@@ -38,11 +62,11 @@ npx skills add mind6683b-a11y/troguard-skills@troguard
 ## 首选：运行脚本
 
 ```bash
-export TROGUARD_API_KEY='trk_...'
+# Key 已在环境变量或 ~/.config/troguard.env 中
 python3 scripts/tro-check.py ./pattern-a.png ./pattern-b.jpg --name "上新自查"
 ```
 
-脚本路径相对于本 skill 目录。它会：
+脚本会优先读取 `TROGUARD_API_KEY`，没有时自动读取 `~/.config/troguard.env`。它会：
 
 1. 读取 1–200 张图片，批量提交到 `POST /api/public/tro-check/batch`
 2. 轮询 `GET /api/public/tro-check/{batch_id}` 直到所有任务结束

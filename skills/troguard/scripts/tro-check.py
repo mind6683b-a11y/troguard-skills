@@ -14,6 +14,7 @@ import urllib.request
 from pathlib import Path
 
 DEFAULT_BASE = "https://app.troguard.com"
+DEFAULT_ENV_FILE = Path.home() / ".config" / "troguard.env"
 MAX_IMAGES = 200
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_TOTAL_BYTES = 60 * 1024 * 1024
@@ -30,14 +31,19 @@ RISK_LABEL = {
 
 GET_KEY_HELP = """未设置 TROGUARD_API_KEY。
 
-获取方式：
-1. 打开 https://app.troguard.com/ 并登录
-2. 左上角切换到要计费的团队
-3. 左侧「Agent → Agent Skill」→ 创建 API Key
-4. 复制 Key 后设置：export TROGUARD_API_KEY='trk_...'
+新用户：打开 https://app.troguard.com/ 注册并验证邮箱，送 200 盾石
+（约 200 次深度检测），不需要信用卡。
+已有账号：登录 → 左侧「Agent → Agent Skill」→ 创建 API Key。
 
+安全保存（不会回显，写入 ~/.config/troguard.env）：
+  mkdir -p ~/.config
+  read -rsp "TroGuard API Key: " TROGUARD_API_KEY && echo
+  (umask 077 && printf "TROGUARD_API_KEY='%s'\\n" "$TROGUARD_API_KEY" > ~/.config/troguard.env)
+  unset TROGUARD_API_KEY
+
+脚本会自动读取 ~/.config/troguard.env。
 直达：https://app.troguard.com/team/api-keys
-只有管理员/超级管理员可以创建；每次调用扣 1 盾石。"""
+1 盾石/张；失败任务退还。"""
 
 
 class ApiError(Exception):
@@ -289,6 +295,9 @@ def main() -> int:
         load_env_file(args.env_file)
 
     api_key = os.environ.get("TROGUARD_API_KEY", "").strip()
+    if not api_key and not args.env_file and DEFAULT_ENV_FILE.is_file():
+        load_env_file(str(DEFAULT_ENV_FILE))
+        api_key = os.environ.get("TROGUARD_API_KEY", "").strip()
     if not api_key:
         print(GET_KEY_HELP, file=sys.stderr)
         return 1
