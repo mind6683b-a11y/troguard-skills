@@ -33,7 +33,7 @@ read -rsp "TroGuard API Key: " TROGUARD_API_KEY && echo
 unset TROGUARD_API_KEY
 ```
 
-脚本会自动读取 `~/.config/troguard.env`；也可以直接 `export TROGUARD_API_KEY='trk_...'`。不要在聊天、仓库或日志里保存完整 Key；泄露后在门户立即吊销。
+脚本会自动读取 `~/.config/troguard.env`；也可以直接 `export TROGUARD_API_KEY='trk_...'`。不会用终端的话，可以把 Key 发给 Agent，让 Agent 帮你写入配置文件；配置完成后不要在聊天里回显完整 Key。
 
 ## 使用
 

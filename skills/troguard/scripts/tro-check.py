@@ -41,6 +41,7 @@ GET_KEY_HELP = """未设置 TROGUARD_API_KEY。
   (umask 077 && printf "TROGUARD_API_KEY='%s'\\n" "$TROGUARD_API_KEY" > ~/.config/troguard.env)
   unset TROGUARD_API_KEY
 
+不会用终端？把 Key 发给 Agent，让 Agent 帮你写入配置。
 脚本会自动读取 ~/.config/troguard.env。
 直达：https://app.troguard.com/team/api-keys
 1 盾石/张；失败任务退还。"""
