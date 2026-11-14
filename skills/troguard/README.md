@@ -14,6 +14,10 @@
 npx skills add mind6683b-a11y/troguard-skills@troguard
 ```
 
+## 手动安装（zip）
+
+下载 [troguard-skill.zip](https://github.com/mind6683b-a11y/troguard-skills/raw/main/dist/troguard-skill.zip)，解压后把 `troguard/` 放到 Agent 的 skills 目录，例如 `~/.agents/skills/` 或 `~/.claude/skills/`。
+
 ## 配置
 
 还没有账号？先到 <https://app.troguard.com/> 注册并验证邮箱，**送 200 盾石，约 200 次深度检测**（1 盾石/张），不需要信用卡。
