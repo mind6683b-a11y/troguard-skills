@@ -122,7 +122,7 @@ def request_json(
 ) -> tuple[int, dict]:
     headers = {
         "Accept": "application/json",
-        "User-Agent": "troguard-skill/1.1",
+        "User-Agent": "troguard-skill/1.2",
     }
     if api_key:
         headers["X-API-Key"] = api_key
@@ -301,7 +301,7 @@ def summarize(batch: dict) -> str:
     jobs = batch.get("jobs") or []
     status = {"succeeded": 0, "failed": 0, "canceled": 0, "running": 0}
     counts = {level: 0 for level in RISK_ORDER}
-    risks: list[tuple[str, str, str, str]] = []
+    risks: list[tuple[str, str, str, str, str, str]] = []
     for job in jobs:
         job_status = job.get("status") or "unknown"
         if job_status in status:
@@ -322,12 +322,18 @@ def summarize(batch: dict) -> str:
                         or evidence[0].get("domain")
                         or ""
                     )
+                image_url = str(job.get("image_url") or "")
+                thumbnail = ""
+                if evidence:
+                    thumbnail = str(evidence[0].get("thumbnail") or "")
                 risks.append(
                     (
                         str(job.get("filename") or job.get("id") or "?"),
                         level,
                         str(result.get("summary") or ""),
                         title,
+                        image_url,
+                        thumbnail,
                     )
                 )
     lines = [
@@ -346,10 +352,14 @@ def summarize(batch: dict) -> str:
     ]
     if risks:
         lines.append("高风险图片:")
-        for filename, level, summary, title in risks:
+        for filename, level, summary, title, image_url, thumbnail in risks:
             lines.append(f"  - {filename} [{RISK_LABEL[level]}] {summary}")
             if title:
                 lines.append(f"    证据: {title}")
+            if thumbnail:
+                lines.append(f"    ![证据：{title or filename}]({thumbnail})")
+            elif image_url:
+                lines.append(f"    ![原图：{filename}]({image_url})")
     else:
         lines.append("未发现极高/高风险图片；未命中不代表没有风险，仍建议核对来源。")
     return "\n".join(lines)
@@ -367,6 +377,9 @@ def summarize_free(batch: dict, cta: dict) -> str:
         lines.append("")
         lines.append(f"文件: {job.get('filename') or '-'}")
         lines.append(f"状态: {status}")
+        image_url = str(job.get("image_url") or "")
+        if image_url:
+            lines.append(f"原图: ![原图：{job.get('filename') or '-'}]({image_url})")
         if status != "succeeded":
             if job.get("error"):
                 lines.append(f"错误: {job.get('error')}")
@@ -391,7 +404,10 @@ def summarize_free(batch: dict, cta: dict) -> str:
                 relation = RELATION_LABEL.get(str(item.get("relation") or ""), "")
                 meta = " · ".join(value for value in (source_type, relation) if value)
                 lines.append(f"  - {title}" + (f"（{meta}）" if meta else ""))
-                if item.get("url"):
+                thumbnail = str(item.get("thumbnail") or "")
+                if thumbnail:
+                    lines.append(f"    ![证据：{title}]({thumbnail})")
+                elif item.get("url"):
                     lines.append(f"    {item['url']}")
         advice = result.get("advice") or []
         if advice:
