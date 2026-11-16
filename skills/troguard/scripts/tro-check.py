@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""TroGuard batch detection helper. Python 3.8+ standard library only."""
+"""TroGuard free single-image helper. Python 3.8+ standard library only.
+
+Default: anonymous free check for exactly one image (no API key).
+With TROGUARD_API_KEY: existing API-key batch path (1-200 images).
+"""
 
 import argparse
 import base64
@@ -10,11 +14,13 @@ import ssl
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 DEFAULT_BASE = "https://app.troguard.com"
 DEFAULT_ENV_FILE = Path.home() / ".config" / "troguard.env"
+FREE_MAX_IMAGES = 1
 MAX_IMAGES = 200
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_TOTAL_BYTES = 60 * 1024 * 1024
@@ -28,23 +34,52 @@ RISK_LABEL = {
     "low": "低风险",
     "unknown": "待确认",
 }
+VERDICT_LABEL = {
+    "likely_infringing": "高度疑似侵权",
+    "possible_infringing": "疑似侵权",
+    "unlikely_infringing": "未发现明显风险",
+    "inconclusive": "无法判断",
+}
+SOURCE_LABEL = {
+    "tro_case": "涉诉案件",
+    "case_library": "案件库",
+    "licensing_agency": "授权机构",
+    "stock": "图库素材",
+    "portfolio": "作品集",
+    "marketplace": "电商在售",
+    "brand_official": "品牌官方",
+    "social": "社交平台",
+    "own": "自有站点",
+    "news": "其他来源",
+}
+RELATION_LABEL = {
+    "same_image": "同一张图",
+    "same_product_other_shot": "同款商品",
+    "similar_style": "风格相似",
+    "unrelated": "无关",
+    "unknown": "未判定",
+}
 
-GET_KEY_HELP = """未设置 TROGUARD_API_KEY。
+GET_KEY_HELP = """批量检测需要 TROGUARD_API_KEY。
 
-新用户：打开 https://app.troguard.com/ 注册并验证邮箱，送 200 盾石
-（约 200 次深度检测），不需要信用卡。
-已有账号：登录 → 左侧「Agent → Agent Skill」→ 创建 API Key。
+免费单图不需要 Key：直接运行
+  python3 scripts/tro-check.py ./pattern.png
 
-安全保存（不会回显，写入 ~/.config/troguard.env）：
+需要批量/历史/团队时：
+1. 打开 https://app.troguard.com/ 注册并验证邮箱，送 200 盾石
+   （约 200 次深度检测），不需要信用卡。
+2. 登录 → 左侧「Agent → Agent Skill」→ 创建 API Key。
+3. 安全保存（不会回显，写入 ~/.config/troguard.env，权限 600）：
+
   mkdir -p ~/.config
   read -rsp "TroGuard API Key: " TROGUARD_API_KEY && echo
   (umask 077 && printf "TROGUARD_API_KEY='%s'\\n" "$TROGUARD_API_KEY" > ~/.config/troguard.env)
   unset TROGUARD_API_KEY
 
 不会用终端？把 Key 发给 Agent，让 Agent 帮你写入配置。
-脚本会自动读取 ~/.config/troguard.env。
+脚本会自动读取 ~/.config/troguard.env；也可以 export TROGUARD_API_KEY。
 直达：https://app.troguard.com/team/api-keys
-1 盾石/张；失败任务退还。"""
+批量 1 盾石/张；失败任务退还。"""
 
 
 class ApiError(Exception):
@@ -80,16 +115,17 @@ def request_json(
     opener: urllib.request.OpenerDirector,
     method: str,
     url: str,
-    api_key: str,
+    api_key: str = "",
     body: dict | None = None,
     extra_headers: dict | None = None,
     timeout: int = 60,
 ) -> tuple[int, dict]:
     headers = {
-        "X-API-Key": api_key,
         "Accept": "application/json",
-        "User-Agent": "troguard-skill/1.0",
+        "User-Agent": "troguard-skill/1.1",
     }
+    if api_key:
+        headers["X-API-Key"] = api_key
     if extra_headers:
         headers.update(extra_headers)
     data = None
@@ -115,19 +151,36 @@ def http_error_message(status: int, payload: dict) -> str:
     code = str(payload.get("code") or "")
     message = str(payload.get("message") or "").strip()
     if status == 401:
-        return (
-            "API Key 无效或已吊销，请到 "
-            "https://app.troguard.com/team/api-keys 重新创建。"
-        )
+        return "免费检测凭证无效或已过期；批量请检查 API Key。"
     if status == 402 and code == "insufficient_credits":
         return "盾石不足，请到 https://app.troguard.com/ 充值后重试。"
     if status == 410 or code == "aipay_deprecated":
-        return "402 按次支付已停用，请使用 API Key 调用。"
+        return "402 按次支付已停用；免费单图请使用本脚本，批量请创建 API Key。"
+    if code == "skill_free_active":
+        return "当前 IP 已有检测在运行，请等待完成后再试。"
+    if code == "skill_free_daily_limit":
+        return "今日免费检测次数已用完；注册后可继续检测。"
+    if code == "skill_free_global_limit":
+        return "今日免费检测额度已用完，请稍后再试。"
+    if status == 503:
+        return message or "免费检测暂不可用，请稍后再试。"
     if status == 429:
-        return "触发限流，请降低并发或稍后重试。"
+        return message or "请求过于频繁，请稍后再试。"
     if message:
         return f"HTTP {status} {code}: {message}".strip()
     return f"HTTP {status}"
+
+
+def read_image(path: str) -> tuple[Path, bytes]:
+    file_path = Path(path).expanduser()
+    if not file_path.is_file():
+        raise ValueError(f"图片不存在: {file_path}")
+    data = file_path.read_bytes()
+    if not data:
+        raise ValueError(f"图片为空: {file_path}")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError(f"{file_path.name} 超过 10MB（{len(data) / 1024 / 1024:.1f}MB）")
+    return file_path, data
 
 
 def encode_images(paths: list[str], name: str) -> tuple[list[dict], str]:
@@ -135,16 +188,7 @@ def encode_images(paths: list[str], name: str) -> tuple[list[dict], str]:
     digest = hashlib.sha256()
     total = 0
     for raw in paths:
-        path = Path(raw).expanduser()
-        if not path.is_file():
-            raise ValueError(f"图片不存在: {path}")
-        data = path.read_bytes()
-        if not data:
-            raise ValueError(f"图片为空: {path}")
-        if len(data) > MAX_IMAGE_BYTES:
-            raise ValueError(
-                f"{path.name} 超过 10MB（{len(data) / 1024 / 1024:.1f}MB）"
-            )
+        path, data = read_image(raw)
         total += len(data)
         if total > MAX_TOTAL_BYTES:
             raise ValueError("图片总量超过 60MB，请分批提交")
@@ -161,6 +205,31 @@ def encode_images(paths: list[str], name: str) -> tuple[list[dict], str]:
     digest.update(name.encode("utf-8"))
     idempotency = "troguard-" + digest.hexdigest()[:32]
     return images, idempotency
+
+
+def submit_free(
+    opener: urllib.request.OpenerDirector,
+    base: str,
+    image: dict,
+    source: str,
+) -> dict:
+    status, payload = request_json(
+        opener,
+        "POST",
+        f"{base}/api/public/skill/check",
+        body={
+            "image_base64": image["image_base64"],
+            "filename": image["filename"],
+            "source": source,
+        },
+        timeout=180,
+    )
+    if status != 200 or payload.get("code") != "ok":
+        raise ApiError(http_error_message(status, payload))
+    data = payload.get("data") or {}
+    if not data.get("batch_id") or not data.get("token"):
+        raise ApiError("接口没有返回 batch_id 或 token")
+    return data
 
 
 def submit_batch(
@@ -191,31 +260,39 @@ def submit_batch(
 def poll_batch(
     opener: urllib.request.OpenerDirector,
     base: str,
-    api_key: str,
     batch_id: str,
+    token: str,
+    api_key: str,
     timeout: int,
-) -> dict:
+) -> tuple[dict, dict]:
+    url = f"{base}/api/public/skill/check/{batch_id}"
+    if token:
+        url += "?" + urllib.parse.urlencode({"token": token})
     deadline = time.time() + timeout
     while True:
         status, payload = request_json(
             opener,
             "GET",
-            f"{base}/api/public/tro-check/{batch_id}",
+            url,
             api_key,
             timeout=60,
         )
         if status != 200 or payload.get("code") != "ok":
             raise ApiError(http_error_message(status, payload))
-        batch = payload.get("data") or {}
+        data = payload.get("data") or {}
+        if token:
+            batch = data.get("batch") or {}
+            cta = data.get("cta") or {}
+        else:
+            batch = data
+            cta = {}
         jobs = batch.get("jobs") or []
-        total = int(batch.get("total") or 0)
-        complete = bool(jobs) and (total == 0 or len(jobs) >= total)
-        if complete and all(job.get("status") in TERMINAL for job in jobs):
-            return batch
+        complete = bool(jobs) and all(job.get("status") in TERMINAL for job in jobs)
+        if complete:
+            return batch, cta
         if time.time() >= deadline:
             raise TimeoutError(
-                f"等待批次超时（{timeout}s），batch_id={batch_id}；"
-                f"可继续查询 GET /api/public/tro-check/{batch_id}"
+                f"等待检测超时（{timeout}s），batch_id={batch_id}；可继续查询同一接口"
             )
         time.sleep(POLL_INTERVAL)
 
@@ -278,16 +355,72 @@ def summarize(batch: dict) -> str:
     return "\n".join(lines)
 
 
+def summarize_free(batch: dict, cta: dict) -> str:
+    jobs = batch.get("jobs") or []
+    lines = [
+        f"批次: {batch.get('id') or '-'}",
+        "模式: 免费单图",
+        f"任务: {len(jobs)} 张",
+    ]
+    for job in jobs:
+        status = job.get("status") or "unknown"
+        lines.append("")
+        lines.append(f"文件: {job.get('filename') or '-'}")
+        lines.append(f"状态: {status}")
+        if status != "succeeded":
+            if job.get("error"):
+                lines.append(f"错误: {job.get('error')}")
+            continue
+        result = job.get("result") or {}
+        risk = result.get("risk_level") or "unknown"
+        verdict = result.get("verdict") or "inconclusive"
+        lines.append(f"风险: {RISK_LABEL.get(risk, risk)}")
+        lines.append(f"判定: {VERDICT_LABEL.get(verdict, verdict)}")
+        if isinstance(result.get("confidence"), (int, float)):
+            lines.append(f"置信度: {float(result['confidence']):.2f}")
+        if result.get("summary"):
+            lines.append(f"结论: {result['summary']}")
+        if result.get("requires_verification"):
+            lines.append("需要人工复核: 是")
+        evidence = result.get("evidence") or []
+        if evidence:
+            lines.append("证据:")
+            for item in evidence:
+                title = item.get("title") or item.get("url") or item.get("domain") or "来源"
+                source_type = SOURCE_LABEL.get(str(item.get("source_type") or ""), "")
+                relation = RELATION_LABEL.get(str(item.get("relation") or ""), "")
+                meta = " · ".join(value for value in (source_type, relation) if value)
+                lines.append(f"  - {title}" + (f"（{meta}）" if meta else ""))
+                if item.get("url"):
+                    lines.append(f"    {item['url']}")
+        advice = result.get("advice") or []
+        if advice:
+            lines.append("建议:")
+            for item in advice:
+                lines.append(f"  - {item}")
+    if cta:
+        lines.append("")
+        lines.append("——")
+        lines.append(cta.get("text") or "注册后可继续检测")
+        if cta.get("signup_url"):
+            lines.append(f"注册: {cta['signup_url']}")
+        if cta.get("api_key_url"):
+            lines.append(f"API Key: {cta['api_key_url']}")
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="用 TroGuard API Key 批量检测图片的版权/TRO 风险。",
-        epilog="示例: python3 tro-check.py ./pattern.png --name 上新自查",
+        description="TroGuard：默认免费检测 1 张图；设置 API Key 后可批量。",
+        epilog="示例: python3 tro-check.py ./pattern.png",
     )
-    parser.add_argument("images", nargs="+", help="图片路径，1-200 张")
-    parser.add_argument("--name", default="", help="批次名，可选")
-    parser.add_argument("--json", action="store_true", help="输出完整批次 JSON")
+    parser.add_argument("images", nargs="+", help="图片路径；免费 1 张，API Key 最多 200 张")
+    parser.add_argument("--free", action="store_true", help="强制使用免费单图接口")
+    parser.add_argument("--name", default="", help="批次名（API Key 批量时可选）")
+    parser.add_argument("--source", default="skill", help="来源标记，默认 skill")
+    parser.add_argument("--json", action="store_true", help="输出完整 JSON")
     parser.add_argument("--env-file", default="", help="从文件读取 TROGUARD_* 环境变量")
-    parser.add_argument("--timeout", type=int, default=600, help="等待批次的秒数")
+    parser.add_argument("--timeout", type=int, default=600, help="等待检测的秒数")
     parser.add_argument("--no-proxy", action="store_true", help="不走系统代理")
     parser.add_argument("--base", default="", help="API 地址，默认 https://app.troguard.com")
     args = parser.parse_args()
@@ -299,9 +432,6 @@ def main() -> int:
     if not api_key and not args.env_file and DEFAULT_ENV_FILE.is_file():
         load_env_file(str(DEFAULT_ENV_FILE))
         api_key = os.environ.get("TROGUARD_API_KEY", "").strip()
-    if not api_key:
-        print(GET_KEY_HELP, file=sys.stderr)
-        return 1
 
     base = (
         args.base
@@ -314,13 +444,43 @@ def main() -> int:
         print("必须使用 https://，不要用 http://", file=sys.stderr)
         return 1
 
+    use_free = args.free or not api_key
+    if use_free and len(args.images) != FREE_MAX_IMAGES:
+        print(
+            f"免费检测一次只接收 {FREE_MAX_IMAGES} 张图片；批量检测请先注册并设置 API Key。",
+            file=sys.stderr,
+        )
+        print(GET_KEY_HELP, file=sys.stderr)
+        return 1
+    if not use_free and not api_key:
+        print(GET_KEY_HELP, file=sys.stderr)
+        return 1
+
     try:
         images, idempotency = encode_images(args.images, args.name)
         opener = make_opener(args.no_proxy)
-        batch = submit_batch(
-            opener, base, api_key, images, args.name, idempotency
-        )
-        batch = poll_batch(opener, base, api_key, str(batch["id"]), args.timeout)
+        if use_free:
+            submitted = submit_free(opener, base, images[0], args.source)
+            batch, cta = poll_batch(
+                opener,
+                base,
+                str(submitted["batch_id"]),
+                str(submitted["token"]),
+                "",
+                args.timeout,
+            )
+        else:
+            batch = submit_batch(
+                opener, base, api_key, images, args.name, idempotency
+            )
+            batch, cta = poll_batch(
+                opener,
+                base,
+                str(batch["id"]),
+                "",
+                api_key,
+                args.timeout,
+            )
     except ValueError as error:
         print(f"参数错误：{error}", file=sys.stderr)
         return 1
@@ -339,7 +499,12 @@ def main() -> int:
         return 1
 
     if args.json:
-        print(json.dumps(batch, ensure_ascii=False, indent=2))
+        if use_free:
+            print(json.dumps({"batch": batch, "cta": cta}, ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps(batch, ensure_ascii=False, indent=2))
+    elif use_free:
+        print(summarize_free(batch, cta))
     else:
         print(summarize(batch))
     return 0
