@@ -1,10 +1,10 @@
 ---
 name: troguard
 description: 用 TroGuard 免费检查 POD 印花、服装和跨境电商图片的版权与 TRO 侵权风险。默认免费单图、无需配置；结果会内嵌相关图片并输出检测报告。需要批量/历史时到 app.troguard.com 注册使用。
-version: 1.2.2
+version: 1.2.3
 metadata:
   author: TroGuard
-  version: 1.2.2
+  version: 1.2.3
 ---
 
 # TroGuard 图片侵权检测
@@ -174,6 +174,8 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 | 401 `unauthorized` | 免费 token 无效/过期 | 重新检测 |
 | 400 `invalid_input` | 图片格式/大小不对，或参数非法 | 修正请求 |
 | 429 `too_many_requests` | 请求过于频繁 | 稍后重试 |
+| 500 `database_error` | 服务端内部错误（如并发位未释放） | **不要连续重新提交**；等 1–2 分钟，或保留 batch_id/token 继续轮询 |
+| 502 / 503 / 504 | 网关或服务暂时不可用 | **不要重新提交**；已有 batch_id 时用同一 token 继续轮询 |
 | TLS reset / `curl: (35)` | 到 `app.troguard.com:443` 的握手被重置 | 用脚本（Python/OpenSSL）或 TLS 1.3 客户端；换网络 |
 
 完整字段、限流和接口说明见 `references/api.md`。

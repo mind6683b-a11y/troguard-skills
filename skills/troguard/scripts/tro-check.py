@@ -163,7 +163,20 @@ def poll_free(
     url = f"{base}/api/public/skill/check/{batch_id}?token={token}"
     deadline = time.time() + timeout
     while True:
-        status, payload = request_json(opener, "GET", url, timeout=60)
+        try:
+            status, payload = request_json(opener, "GET", url, timeout=60)
+        except NetworkError:
+            if time.time() >= deadline:
+                raise
+            time.sleep(POLL_INTERVAL)
+            continue
+        if status in {500, 502, 503, 504}:
+            if time.time() >= deadline:
+                raise ApiError(
+                    "服务暂时不可用；不要重新提交，保留 batch_id/token 继续轮询"
+                )
+            time.sleep(POLL_INTERVAL)
+            continue
         if status != 200 or payload.get("code") != "ok":
             raise ApiError(error_message(status, payload))
         data = payload.get("data") or {}
