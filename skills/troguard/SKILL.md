@@ -1,11 +1,6 @@
 ---
 name: troguard
 description: 用 TroGuard 免费检查 POD 印花、服装和跨境电商图片的版权与 TRO 侵权风险。默认免费单图、无需配置；结果会内嵌相关图片并输出检测报告。需要批量/历史时到 app.troguard.com 注册使用。
-version: 1.2.3
-display_name: 图盾 TroGuard 图片侵权检测
-display_name_en: TroGuard Image Infringement Check
-description_zh: "用 TroGuard 免费检查 POD 印花、服装和跨境电商图片的版权与 TRO 侵权风险。默认免费单图、无需配置；结果会内嵌相关图片并输出检测报告。需要批量/历史时到 app.troguard.com 注册使用。"
-description_en: "Check print-on-demand, apparel, and cross-border ecommerce images for copyright and TRO infringement risk with TroGuard."
 metadata:
   author: TroGuard
   version: 1.2.3
