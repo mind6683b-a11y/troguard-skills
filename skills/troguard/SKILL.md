@@ -129,6 +129,21 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 | `unlikely_infringing` | 未发现明显风险 |
 | `inconclusive` | 无法判断 |
 
+### 平台合规（`compliance`）
+
+平台合规与版权侵权并列判断，只针对上传图本身，不受匹配来源影响。
+
+| 字段 | 中文 | 说明 |
+|---|---|---|
+| `compliance.violation` | 是否违禁 | 为 true 时不要上架 |
+| `compliance.risk_level` | 合规风险 | `high` / `medium` / `low` |
+| `compliance.categories` | 规则类别 | 目前为 `violence_gore_crime_weapons_suicide`（暴力、血腥、犯罪、武器与自杀内容） |
+| `compliance.visible_text` | 识别文字 | 上传图中逐字转写出的可见文字，用于核对命中词 |
+| `compliance.matched_terms` | 命中词 | 如 `MURDER`、`BLOOD`、`自杀` |
+| `compliance.reason` | 合规原因 | 模型给出的简短说明 |
+
+`risk_level` 是版权 + 合规的综合等级；`verdict` 只表示版权/IP 维度。合规违禁时，即使 `verdict=unlikely_infringing` 也不能上架；以 `compliance.violation` 和 `compliance.risk_level` 为准。
+
 ### 字段
 
 | 字段 | 中文 | 说明 |
@@ -136,6 +151,7 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 | `summary` | 结论摘要 | 一句话说明风险 |
 | `confidence` | 置信度 | 0–1，越高越可信 |
 | `evidence[]` | 证据列表 | 来源标题、URL、域名、来源类型、匹配关系 |
+| `compliance` | 平台合规风险 | 违禁判断、类别、命中词和原因 |
 | `advice[]` | 建议 | 下一步排查或处理建议 |
 | `requires_verification` | 需要人工复核 | 为 true 时不要直接下结论 |
 

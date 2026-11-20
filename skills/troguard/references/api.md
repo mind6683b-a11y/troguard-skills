@@ -67,6 +67,13 @@ GET /api/public/skill/check/{batch_id}?token={token}
             "risk_level": "high",
             "verdict": "likely_infringing",
             "confidence": 0.82,
+            "compliance": {
+              "violation": false,
+              "risk_level": "low",
+              "categories": [],
+              "matched_terms": [],
+              "reason": "未发现平台合规风险"
+            },
             "summary": "命中案件库同图，疑似侵犯他人印花版权。",
             "evidence": [
               {
@@ -101,9 +108,15 @@ GET /api/public/skill/check/{batch_id}?token={token}
 |---|---|
 | `batch.status` | `pending` / `running` / `completed` / `failed` / `canceled` |
 | `jobs[].status` | `pending` / `dispatching` / `queued` / `running` / `succeeded` / `failed` / `canceled` |
-| `result.risk_level` | `critical` / `high` / `medium` / `low` / `unknown` |
-| `result.verdict` | `likely_infringing` / `possible_infringing` / `unlikely_infringing` / `inconclusive` |
+| `result.risk_level` | 综合风险（版权 + 平台合规）：`critical` / `high` / `medium` / `low` / `unknown` |
+| `result.verdict` | 版权/IP 判定：`likely_infringing` / `possible_infringing` / `unlikely_infringing` / `inconclusive` |
 | `result.confidence` | 0–1 |
+| `result.compliance.violation` | 是否命中平台合规违禁；true 时不要上架 |
+| `result.compliance.risk_level` | 合规风险：`high` / `medium` / `low` |
+| `result.compliance.categories[]` | 规则类别，目前为 `violence_gore_crime_weapons_suicide` |
+| `result.compliance.visible_text` | 上传图中逐字转写的可见文字 |
+| `result.compliance.matched_terms[]` | 命中的违禁词，如 `MURDER`、`自杀` |
+| `result.compliance.reason` | 合规原因 |
 | `result.summary` | 一句话结论 |
 | `result.evidence[]` | 来源标题、URL、域名、类型、匹配关系、缩略图 |
 | `result.advice[]` | 处理建议 |

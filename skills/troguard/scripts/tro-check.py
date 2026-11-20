@@ -47,6 +47,9 @@ RELATION_LABEL = {
     "unrelated": "无关",
     "unknown": "未判定",
 }
+COMPLIANCE_CATEGORY_LABEL = {
+    "violence_gore_crime_weapons_suicide": "暴力、血腥、犯罪、武器与自杀内容",
+}
 
 
 class ApiError(Exception):
@@ -241,6 +244,34 @@ def summarize(batch: dict, cta: dict) -> str:
         verdict = result.get("verdict") or "inconclusive"
         lines.append(f"风险等级: {RISK_LABEL.get(risk, risk)}")
         lines.append(f"判定: {VERDICT_LABEL.get(verdict, verdict)}")
+        compliance = result.get("compliance")
+        if isinstance(compliance, dict):
+            if compliance.get("violation"):
+                level = str(compliance.get("risk_level") or "")
+                categories = "、".join(
+                    COMPLIANCE_CATEGORY_LABEL.get(str(item), str(item))
+                    for item in (compliance.get("categories") or [])
+                    if item
+                )
+                terms = "、".join(
+                    str(item) for item in (compliance.get("matched_terms") or []) if item
+                )
+                detail = " · ".join(
+                    value
+                    for value in (
+                        RISK_LABEL.get(level, level),
+                        categories,
+                        f"命中 {terms}" if terms else "",
+                    )
+                    if value
+                )
+                lines.append(f"平台合规: {detail or '命中'}")
+                if compliance.get("visible_text"):
+                    lines.append(f"识别文字: {compliance['visible_text']}")
+                if compliance.get("reason"):
+                    lines.append(f"合规原因: {compliance['reason']}")
+            else:
+                lines.append("平台合规: 未发现明显违规")
         if isinstance(result.get("confidence"), (int, float)):
             lines.append(f"置信度: {float(result['confidence']):.2f}")
         if result.get("summary"):
