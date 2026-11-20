@@ -108,30 +108,23 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 
 ## 结果怎么读
 
-先看风险等级，再看判定和证据；不要只看分数。
+结果只分两类风险：**侵权风险**和**平台合规**。综合风险只用于排序，不是第三类。
 
-### 风险等级（`risk_level`）
+### 侵权风险（`infringement_risk`）
+
+版权、TRO、商标、品牌、角色、真人肖像/形象权都归入这一类。
 
 | 值 | 中文 | 含义 | 建议 |
 |---|---|---|---|
 | `critical` | 极高风险 | 命中涉诉/维权来源或案件库同图，且为同一张图或同款商品 | 优先核对权利人、案号、案件图，上架前处理 |
-| `high` | 高风险 | 命中案件库，或高可信来源存在强视觉关系 | 人工核对来源和授权 |
+| `high` | 高风险 | 命中案件库、高可信来源存在强视觉关系，或可识别真人肖像用于商品 | 人工核对来源、授权或肖像许可 |
 | `medium` | 中风险 | 存在相似来源，但证据强度或置信度不足 | 补充检索或人工核对 |
 | `low` | 低风险 | 未发现明显相同或高度相似的来源 | 留档，仍需抽查 |
 | `unknown` | 待确认 | 搜图失败或信息不足，暂不给出风险结论 | 不要当作安全，重跑或人工核对 |
 
-### 判定（`verdict`）
-
-| 值 | 中文 |
-|---|---|
-| `likely_infringing` | 高度疑似侵权 |
-| `possible_infringing` | 疑似侵权 |
-| `unlikely_infringing` | 未发现明显风险 |
-| `inconclusive` | 无法判断 |
-
 ### 平台合规（`compliance`）
 
-平台合规与版权侵权并列判断，只针对上传图本身，不受匹配来源影响。
+平台合规与侵权风险并列判断，只针对上传图本身，不受匹配来源影响。
 
 | 字段 | 中文 | 说明 |
 |---|---|---|
@@ -142,7 +135,22 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 | `compliance.matched_terms` | 命中词 | 如 `MURDER`、`BLOOD`、`自杀` |
 | `compliance.reason` | 合规原因 | 模型给出的简短说明 |
 
-`risk_level` 是版权 + 合规的综合等级；`verdict` 只表示版权/IP 维度。合规违禁时，即使 `verdict=unlikely_infringing` 也不能上架；以 `compliance.violation` 和 `compliance.risk_level` 为准。
+### 综合风险（`risk_level`）
+
+`risk_level` 取 `infringement_risk` 与 `compliance.risk_level` 的较高者，只用于列表排序和综合展示；不要把 `risk_level` 当作第三类风险。
+
+### 判定（`verdict`）
+
+`verdict` 只描述侵权维度。
+
+| 值 | 中文 |
+|---|---|
+| `likely_infringing` | 高度疑似侵权 |
+| `possible_infringing` | 疑似侵权 |
+| `unlikely_infringing` | 未发现明显风险 |
+| `inconclusive` | 无法判断 |
+
+合规违禁时，即使 `verdict=unlikely_infringing` 也不能上架；以 `compliance.violation` 和 `compliance.risk_level` 为准。
 
 ### 字段
 
@@ -150,6 +158,8 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 |---|---|---|
 | `summary` | 结论摘要 | 一句话说明风险 |
 | `confidence` | 置信度 | 0–1，越高越可信 |
+| `infringement_risk` | 侵权风险 | 版权/TRO/商标/品牌/角色/真人肖像，等级 `critical` / `high` / `medium` / `low` / `unknown` |
+| `risk_level` | 综合风险 | 取侵权风险与平台合规的较高者，只用于排序/综合展示 |
 | `evidence[]` | 证据列表 | 来源标题、URL、域名、来源类型、匹配关系 |
 | `compliance` | 平台合规风险 | 违禁判断、类别、命中词和原因 |
 | `ai.basic_only` | 仅基础检测 | 为 true 时没有版权匹配图，结论来自合规/肖像/明显品牌基础检测 |

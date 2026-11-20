@@ -65,6 +65,7 @@ GET /api/public/skill/check/{batch_id}?token={token}
           "image_url": "https://...",
           "result": {
             "risk_level": "high",
+            "infringement_risk": "high",
             "verdict": "likely_infringing",
             "confidence": 0.82,
             "compliance": {
@@ -108,8 +109,9 @@ GET /api/public/skill/check/{batch_id}?token={token}
 |---|---|
 | `batch.status` | `pending` / `running` / `completed` / `failed` / `canceled` |
 | `jobs[].status` | `pending` / `dispatching` / `queued` / `running` / `succeeded` / `failed` / `canceled` |
-| `result.risk_level` | 综合风险（版权 + 平台合规）：`critical` / `high` / `medium` / `low` / `unknown` |
-| `result.verdict` | 版权/IP 判定：`likely_infringing` / `possible_infringing` / `unlikely_infringing` / `inconclusive` |
+| `result.infringement_risk` | 侵权风险（版权/TRO/商标/品牌/角色/真人肖像）：`critical` / `high` / `medium` / `low` / `unknown` |
+| `result.risk_level` | 综合风险（侵权 + 平台合规）：`critical` / `high` / `medium` / `low` / `unknown`，只用于排序/综合展示 |
+| `result.verdict` | 侵权判定：`likely_infringing` / `possible_infringing` / `unlikely_infringing` / `inconclusive` |
 | `result.confidence` | 0–1 |
 | `result.compliance.violation` | 是否命中平台合规违禁；true 时不要上架 |
 | `result.compliance.risk_level` | 合规风险：`high` / `medium` / `low` |

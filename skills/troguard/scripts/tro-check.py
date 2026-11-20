@@ -241,8 +241,9 @@ def summarize(batch: dict, cta: dict) -> str:
             continue
         result = job.get("result") or {}
         risk = result.get("risk_level") or "unknown"
+        infringement = result.get("infringement_risk") or risk
         verdict = result.get("verdict") or "inconclusive"
-        lines.append(f"风险等级: {RISK_LABEL.get(risk, risk)}")
+        lines.append(f"侵权风险: {RISK_LABEL.get(infringement, infringement)}")
         lines.append(f"判定: {VERDICT_LABEL.get(verdict, verdict)}")
         ai = result.get("ai")
         if isinstance(ai, dict) and ai.get("basic_only"):
@@ -275,6 +276,8 @@ def summarize(batch: dict, cta: dict) -> str:
                     lines.append(f"合规原因: {compliance['reason']}")
             else:
                 lines.append("平台合规: 未发现明显违规")
+        else:
+            lines.append(f"综合风险: {RISK_LABEL.get(risk, risk)}")
         if isinstance(result.get("confidence"), (int, float)):
             lines.append(f"置信度: {float(result['confidence']):.2f}")
         if result.get("summary"):
