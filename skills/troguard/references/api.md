@@ -121,6 +121,7 @@ GET /api/public/skill/check/{batch_id}?token={token}
 | `result.evidence[]` | 来源标题、URL、域名、类型、匹配关系、缩略图 |
 | `result.advice[]` | 处理建议 |
 | `result.requires_verification` | 是否建议人工复核 |
+| `result.ai.basic_only` | 为 true 时没有版权匹配图，结论来自基础检测（合规/肖像/明显品牌） |
 | `jobs[].image_url` | 原图签名 URL |
 | `evidence[].thumbnail` | 案件库/证据缩略图签名 URL |
 

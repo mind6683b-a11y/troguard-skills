@@ -244,6 +244,9 @@ def summarize(batch: dict, cta: dict) -> str:
         verdict = result.get("verdict") or "inconclusive"
         lines.append(f"风险等级: {RISK_LABEL.get(risk, risk)}")
         lines.append(f"判定: {VERDICT_LABEL.get(verdict, verdict)}")
+        ai = result.get("ai")
+        if isinstance(ai, dict) and ai.get("basic_only"):
+            lines.append("检测方式: 基础检测（未找到版权匹配图）")
         compliance = result.get("compliance")
         if isinstance(compliance, dict):
             if compliance.get("violation"):

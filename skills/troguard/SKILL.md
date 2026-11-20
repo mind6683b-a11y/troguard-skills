@@ -152,8 +152,11 @@ GET https://app.troguard.com/api/public/skill/check/{batch_id}?token=...
 | `confidence` | 置信度 | 0–1，越高越可信 |
 | `evidence[]` | 证据列表 | 来源标题、URL、域名、来源类型、匹配关系 |
 | `compliance` | 平台合规风险 | 违禁判断、类别、命中词和原因 |
+| `ai.basic_only` | 仅基础检测 | 为 true 时没有版权匹配图，结论来自合规/肖像/明显品牌基础检测 |
 | `advice[]` | 建议 | 下一步排查或处理建议 |
 | `requires_verification` | 需要人工复核 | 为 true 时不要直接下结论 |
+
+没有版权匹配图时 `evidence` 为空且 `ai.basic_only=true`；此时不要声称命中 TRO 或案件库，结论只代表对上传图本身的基础检测。
 
 ### 证据（`evidence[]`）
 
